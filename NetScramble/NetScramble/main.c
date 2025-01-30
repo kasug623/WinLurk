@@ -29,7 +29,7 @@ void GetNICUUIDs() {
 
     PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
     while (pCurrAddresses) {
-        printf("NIC Name: %s\n", pCurrAddresses->FriendlyName);
+        wprintf(L"NIC Name: %ls\n", pCurrAddresses->FriendlyName);
         printf("NIC UUID: %s\n\n", pCurrAddresses->AdapterName); // GUID‚ªŠi”[‚³‚ê‚Ä‚¢‚é
 
         pCurrAddresses = pCurrAddresses->Next;
