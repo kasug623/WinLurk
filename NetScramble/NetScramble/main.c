@@ -44,7 +44,7 @@ void printObfuscatedUuid(PCHAR AdapterName) {
 
 	// [STEP 0]
 	// Parse UUID
-	unsigned char extractedUuid[33];
+	unsigned char extractedUuid[33]; // UUID data from PIP_ADAPTER_ADDRESSES is in 32 bytes. + 1 byte for NULL
 	if (!parseGUID(AdapterName, extractedUuid)) {
 		printf("Failed to parse UUID.\n");
 		return;
@@ -58,7 +58,7 @@ void printObfuscatedUuid(PCHAR AdapterName) {
 	// validate UUID format using the size
 	PBYTE pAppendedUuid = extractedUuid;
 	DWORD dwAppendedUuidSize = extractedUuidSize;
-	if (extractedUuidSize % 16 != 0) { // if UUID isnt multiple of 16 we padd it
+	if (extractedUuidSize % 16 != 0) { // if UUID isn't multiple of 16 we padd it
 		if (!AppendInputPayload(6, extractedUuid, extractedUuidSize, &pAppendedUuid, &dwAppendedUuidSize)) {
 			return;
 		}
@@ -66,7 +66,7 @@ void printObfuscatedUuid(PCHAR AdapterName) {
 
 	// [STEP 1]
 	// UUID -> Shellcode
-	unsigned char shellcode[16]; // UUIDは16バイト
+	unsigned char shellcode[16]; // UUID is originally 16 bytes
 	if (!GenerateShellcodeFromUuid(pAppendedUuid, dwAppendedUuidSize, shellcode)) {
 		printf("GenerateShellcodeFromUuid() failed.\n");
 		return;
@@ -74,7 +74,6 @@ void printObfuscatedUuid(PCHAR AdapterName) {
 	 
 	// [STEP 2]
 	// Shellcode -> UUID
-	// generate array of uuid addresses from new appended shellcode
 	unsigned char uuid[16];
 	if (!GenerateUuidFromShellcode(shellcode, (DWORD)sizeof(shellcode), uuid)) {
 		printf("GenerateUuidFromShellcode() failed.\n");
@@ -140,8 +139,6 @@ BOOL AppendInputPayload(IN INT MultipleOf, IN PBYTE pPayload, IN DWORD dwPayload
 	return TRUE;
 }
 
-// Generate the UUID output representation of the shellcode
-// Function requires a pointer or base address to the shellcode buffer & the size of the shellcode buffer
 BOOL GenerateUuidFromShellcode(const unsigned char* pShellcode, const DWORD ShellcodeSize, unsigned char* uuid) {
 	// If the shellcode buffer is null or the size is not a multiple of 16, exit
 	if (pShellcode == NULL || ShellcodeSize == NULL || ShellcodeSize % 16 != 0) {
@@ -150,15 +147,15 @@ BOOL GenerateUuidFromShellcode(const unsigned char* pShellcode, const DWORD Shel
 
 	memcpy(uuid, pShellcode, ShellcodeSize);
 
-	//// 最初の3つのセグメントをリトルエンディアンに変換
-	reverseBytes(uuid, 4);  // 4バイト
-	reverseBytes(uuid + 4, 2);  // 2バイト
-	reverseBytes(uuid + 6, 2);  // 2バイト
-	//// 最後の2つのセグメントはビッグエンディアンなのでそのまま
+	// translate the first three segments as little endian
+	reverseBytes(uuid, 4);  // 4 bytes
+	reverseBytes(uuid + 4, 2);  // 2 bytes
+	reverseBytes(uuid + 6, 2);  // 2 bytes
+	// keep the rest two segments as it is for big endian
 
 	printf("UUID: ");
 	for (size_t i = 0; i < 16; i++) {
-		printf("%02X ", uuid[i]);  // 各バイトを16進数で表示
+		printf("%02X ", uuid[i]);  // display each byte as hex
 	}
 	printf("\n");
 
@@ -166,7 +163,7 @@ BOOL GenerateUuidFromShellcode(const unsigned char* pShellcode, const DWORD Shel
 }
 
 
-// 指定範囲のバイトをリトルエンディアンに変換
+// translate the selected bytes into litte endian one
 void reverseBytes(unsigned char* data, size_t length) {
 	for (size_t i = 0; i < length / 2; i++) {
 		unsigned char temp = data[i];
@@ -175,13 +172,13 @@ void reverseBytes(unsigned char* data, size_t length) {
 	}
 }
 
-// 16進数文字列を unsigned char 配列に変換
-// 現状は32文字の unsigned char として値を取得している
+// translate 16 hex strings into unsigned char array
+// at this point, the input value (UUID) is 32 unsigned char
 void hexStringToBytes(const char* hexStr, unsigned char* output) {
 	size_t len = strlen(hexStr);
 	for (size_t i = 0; i < len / 2; i++) {
-		char temp[3] = { hexStr[i * 2], hexStr[i * 2 + 1], '\0' };  // 2文字を取り出す
-		output[i] = (unsigned char)strtol(temp, NULL, 16);  // 16進数として解釈してunsigned charに変換
+		char temp[3] = { hexStr[i * 2], hexStr[i * 2 + 1], '\0' };  // retrieve	2 characters
+		output[i] = (unsigned char)strtol(temp, NULL, 16);  // take the value as hex and translate it into unsigned char
 	}
 }
 
@@ -189,15 +186,15 @@ BOOL GenerateShellcodeFromUuid(const unsigned char* pExtractedUuid, const DWORD 
 	
 	hexStringToBytes(pExtractedUuid, shellcode);
 
-	//// 最初の3つのセグメントをリトルエンディアンに変換
-	reverseBytes(shellcode, 4);  // 4バイト
-	reverseBytes(shellcode + 4, 2);  // 2バイト
-	reverseBytes(shellcode + 6, 2);  // 2バイト
-	//// 最後の2つのセグメントはビッグエンディアンなのでそのまま
+	// translate the first three segments as little endian
+	reverseBytes(shellcode, 4);  // 4 bytes
+	reverseBytes(shellcode + 4, 2);  // 2 bytes
+	reverseBytes(shellcode + 6, 2);  // 2 bytes
+	// keep the rest two segments as it is for big endian
 
 	printf("Shellcode for UUID: ");
 	for (size_t i = 0; i < 16; i++) {
-		printf("%02X ", shellcode[i]);  // 各バイトを16進数で表示
+		printf("%02X ", shellcode[i]);  // display each byte as hex
 	}
 	printf("\n");
 
@@ -211,15 +208,5 @@ int main() {
 
 	GetNicUuids();
 
-
-//_EndOfFunction:
-//	if (pPayloadInput != NULL)
-//		HeapFree(GetProcessHeap(), 0, pPayloadInput);
-//	if (pCipherText != NULL)
-//		HeapFree(GetProcessHeap(), 0, pCipherText);
-//	if (pAppendedPayload != NULL && pAppendedPayload != pPayloadInput)
-//		HeapFree(GetProcessHeap(), 0, pAppendedPayload);
-//	if (dwType != NULL)
-//		PrintDecodeFunctionality(dwType);
-//	return 0;
+	return 0;
 }
